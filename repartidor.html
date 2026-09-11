@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yeshua Inversiones — Repartidores</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>🔥 Yeshua Inversiones — Repartidores</h1>
+  <a href="index.html" class="nav-link">← Ir a la pantalla de pedidos</a>
+</header>
+
+<main>
+
+  <section class="card">
+    <h2>¿Quién eres?</h2>
+    <div class="selector-repartidor">
+      <select id="select-repartidor">
+        <option value="">— Selecciona tu nombre —</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="card oculto" id="seccion-mis-pedidos">
+    <h2>Mis pedidos</h2>
+    <div id="lista-mis-pedidos">
+      <p class="ayuda">Cargando…</p>
+    </div>
+  </section>
+
+  <section class="card oculto" id="seccion-historial">
+    <h2>Historial reciente</h2>
+    <div id="lista-historial">
+      <p class="ayuda">Cargando…</p>
+    </div>
+  </section>
+
+  <p id="mensaje-estado" class="mensaje-estado oculto"></p>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="repartidor.js"></script>
+</body>
+</html>

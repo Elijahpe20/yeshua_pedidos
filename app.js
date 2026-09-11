@@ -43,6 +43,9 @@ const cuerpoTabla = el('cuerpo-tabla-pedidos');
 
 const bloqueCancelar = el('bloque-cancelar');
 const pedMotivoCancelacion = el('ped-motivo-cancelacion');
+const listaIncidencias = el('lista-incidencias');
+
+let repartidoresActivos = [];
 
 // -------- Utilidades --------
 function mostrar(elemento) { elemento.classList.remove('oculto'); }
@@ -534,17 +537,17 @@ async function cancelarPedido() {
 async function cargarPedidosRecientes() {
   const { data, error } = await sb
     .from('pedidos')
-    .select('*, clientes(nombre_o_negocio, telefono, tipo, notas)')
+    .select('*, clientes(nombre_o_negocio, telefono, tipo, notas), repartidores(nombre)')
     .order('fecha_hora_creado', { ascending: false })
     .limit(30);
 
   if (error) {
-    cuerpoTabla.innerHTML = `<tr><td colspan="11">Error cargando pedidos: ${escaparHtml(error.message)}</td></tr>`;
+    cuerpoTabla.innerHTML = `<tr><td colspan="12">Error cargando pedidos: ${escaparHtml(error.message)}</td></tr>`;
     return;
   }
 
   if (!data || data.length === 0) {
-    cuerpoTabla.innerHTML = '<tr><td colspan="11">Todavía no hay pedidos.</td></tr>';
+    cuerpoTabla.innerHTML = '<tr><td colspan="12">Todavía no hay pedidos.</td></tr>';
     return;
   }
 
@@ -559,6 +562,7 @@ async function cargarPedidosRecientes() {
       <td>${escaparHtml(p.origen_venta)}</td>
       <td>${escaparHtml(p.barrio_sector)}</td>
       <td><span class="pill ${p.estado}">${p.estado}</span></td>
+      <td>${celdaRepartidor(p)}</td>
       <td>${escaparHtml(p.recepcionista)}</td>
       <td><button class="link-editar" data-id="${p.pedido_id}">Editar</button></td>
     </tr>
@@ -567,6 +571,117 @@ async function cargarPedidosRecientes() {
   cuerpoTabla.querySelectorAll('button[data-id]').forEach(btn => {
     btn.addEventListener('click', () => cargarPedidoParaEditar(data.find(p => p.pedido_id === btn.dataset.id)));
   });
+
+  cuerpoTabla.querySelectorAll('select[data-asignar]').forEach(select => {
+    select.addEventListener('change', () => asignarRepartidor(select.dataset.asignar, select.value));
+  });
+}
+
+function celdaRepartidor(p) {
+  if (p.estado === 'Creado') {
+    const opciones = repartidoresActivos.map(r =>
+      `<option value="${r.repartidor_id}">${escaparHtml(r.nombre)}</option>`
+    ).join('');
+    return `
+      <select class="select-asignar" data-asignar="${p.pedido_id}">
+        <option value="">— Asignar —</option>
+        ${opciones}
+      </select>
+    `;
+  }
+  return escaparHtml(p.repartidores?.nombre || '—');
+}
+
+async function asignarRepartidor(pedidoId, repartidorId) {
+  if (!repartidorId) return;
+
+  const { error } = await sb
+    .from('pedidos')
+    .update({
+      repartidor_asignado_id: repartidorId,
+      estado: 'Asignado',
+      fecha_hora_asignado: new Date().toISOString()
+    })
+    .eq('pedido_id', pedidoId);
+
+  if (error) { mostrarMensaje('Error asignando repartidor: ' + error.message, 'error'); return; }
+
+  mostrarMensaje('Repartidor asignado.', 'ok');
+  cargarPedidosRecientes();
+}
+
+async function cargarRepartidores() {
+  const { data, error } = await sb
+    .from('repartidores')
+    .select('*')
+    .eq('activo', true)
+    .order('nombre');
+
+  if (error) { mostrarMensaje('Error cargando repartidores: ' + error.message, 'error'); return; }
+  repartidoresActivos = data || [];
+}
+
+// -------- Incidencias --------
+async function cargarIncidencias() {
+  const { data, error } = await sb
+    .from('incidencias')
+    .select('*, pedidos(producto, direccion_entrega)')
+    .order('fecha_hora', { ascending: false })
+    .limit(30);
+
+  if (error) {
+    listaIncidencias.innerHTML = `<p class="ayuda">Error cargando incidencias: ${escaparHtml(error.message)}</p>`;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    listaIncidencias.innerHTML = '<p class="ayuda">No hay incidencias reportadas.</p>';
+    return;
+  }
+
+  listaIncidencias.innerHTML = data.map(inc => `
+    <div class="incidencia-item ${inc.estado === 'resuelta' ? 'incidencia-resuelta' : ''}" data-id="${inc.incidencia_id}">
+      <div class="incidencia-meta">
+        ${formatearFecha(inc.fecha_hora)} — reportado por ${escaparHtml(inc.reportado_por)}
+        ${inc.pedidos ? ' — pedido: ' + escaparHtml(inc.pedidos.producto) + ' (' + escaparHtml(inc.pedidos.direccion_entrega || 'sin dirección') + ')' : ''}
+      </div>
+      <div class="incidencia-descripcion">${escaparHtml(inc.descripcion)}</div>
+      ${inc.estado === 'resuelta'
+        ? `<div class="incidencia-meta">✓ Resuelta por ${escaparHtml(inc.resuelto_por || '—')}: ${escaparHtml(inc.resolucion_aplicada || '')}</div>`
+        : `
+          <textarea class="texto-resolucion" rows="2" placeholder="¿Qué se hizo para resolverlo?"></textarea>
+          <button type="button" class="secundario btn-resolver-incidencia" data-id="${inc.incidencia_id}">Marcar resuelta</button>
+        `
+      }
+    </div>
+  `).join('');
+
+  listaIncidencias.querySelectorAll('.btn-resolver-incidencia').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const contenedor = btn.closest('.incidencia-item');
+      const texto = contenedor.querySelector('.texto-resolucion').value.trim();
+      resolverIncidencia(btn.dataset.id, texto);
+    });
+  });
+}
+
+async function resolverIncidencia(incidenciaId, resolucion) {
+  if (!resolucion) { mostrarMensaje('Escribe qué se hizo para resolverlo.', 'error'); return; }
+
+  const { error } = await sb
+    .from('incidencias')
+    .update({
+      estado: 'resuelta',
+      resolucion_aplicada: resolucion,
+      resuelto_por: pedRecepcionista.value || 'Sin especificar',
+      resuelto_en: new Date().toISOString()
+    })
+    .eq('incidencia_id', incidenciaId);
+
+  if (error) { mostrarMensaje('Error resolviendo incidencia: ' + error.message, 'error'); return; }
+
+  mostrarMensaje('Incidencia marcada como resuelta.', 'ok');
+  cargarIncidencias();
 }
 
 async function cargarPedidoParaEditar(p) {
@@ -624,4 +739,8 @@ async function cargarPedidoParaEditar(p) {
 actualizarBannerCliente('nuevo');
 renderDirecciones();
 renderSelectDireccionPedido();
-cargarPedidosRecientes();
+(async () => {
+  await cargarRepartidores();
+  cargarPedidosRecientes();
+  cargarIncidencias();
+})();
