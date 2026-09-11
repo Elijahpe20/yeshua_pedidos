@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yeshua Inversiones — Toma de pedidos</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>🔥 Yeshua Inversiones — Toma de pedidos</h1>
+</header>
+
+<main>
+
+  <section class="card" id="seccion-cliente">
+    <h2>1. Cliente</h2>
+
+    <div class="fila">
+      <label>Buscar cliente por teléfono o nombre</label>
+      <div class="buscador">
+        <input type="text" id="buscar-cliente" placeholder="Ej: 987654321 o Juan Pérez">
+        <button type="button" id="btn-buscar-cliente">Buscar</button>
+        <button type="button" id="btn-cliente-nuevo" class="secundario">Cliente nuevo</button>
+      </div>
+      <ul id="resultados-cliente" class="resultados"></ul>
+    </div>
+
+    <div id="banner-cliente" class="banner"></div>
+
+    <div id="datos-cliente">
+      <div class="fila">
+        <label for="cli-telefono">Teléfono</label>
+        <input type="text" id="cli-telefono">
+      </div>
+      <div class="fila">
+        <label for="cli-nombre">Nombre o negocio <span class="ayuda">(opcional, se puede completar después)</span></label>
+        <input type="text" id="cli-nombre">
+      </div>
+      <div class="fila">
+        <label for="cli-tipo">Tipo</label>
+        <select id="cli-tipo">
+          <option value="">— Seleccionar —</option>
+          <option value="Hogar">Hogar</option>
+          <option value="Comercial">Comercial</option>
+        </select>
+      </div>
+      <div class="fila">
+        <label for="cli-notas">Notas del cliente (opcional)</label>
+        <textarea id="cli-notas" rows="2"></textarea>
+      </div>
+      <div class="acciones">
+        <button type="button" id="btn-guardar-cliente" class="secundario">Guardar datos del cliente</button>
+      </div>
+
+      <div class="fila">
+        <label>Direcciones guardadas de este cliente</label>
+        <div id="lista-direcciones" class="lista-direcciones">
+          <p class="ayuda">Busca o crea el cliente para ver y agregar sus direcciones.</p>
+        </div>
+      </div>
+
+      <div class="bloque-direccion-nueva">
+        <label for="nueva-direccion-texto">Agregar una dirección nueva</label>
+        <textarea id="nueva-direccion-texto" rows="2" placeholder="Ej: frente al grifo, casa celeste"></textarea>
+        <div class="fila-doble">
+          <div class="fila">
+            <label for="nueva-direccion-etiqueta">Etiqueta (opcional)</label>
+            <input type="text" id="nueva-direccion-etiqueta" placeholder="Ej: Casa, Local, Trabajo">
+          </div>
+          <div class="fila">
+            <label for="nueva-direccion-barrio">Barrio / Sector</label>
+            <select id="nueva-direccion-barrio">
+              <option value="Por Asignar">Por Asignar</option>
+              <option value="Barrio Centro">Barrio Centro</option>
+              <option value="Miraflores">Miraflores</option>
+              <option value="San Carlos">San Carlos</option>
+              <option value="San José">San José</option>
+              <option value="Quillazú">Quillazú</option>
+              <option value="Nueva Berna">Nueva Berna</option>
+              <option value="Santo Domingo">Santo Domingo</option>
+              <option value="Margaritas">Margaritas</option>
+              <option value="20 de Noviembre">20 de Noviembre</option>
+              <option value="Sec. La Esperanza">Sec. La Esperanza</option>
+              <option value="Llamaquizú">Llamaquizú</option>
+              <option value="San Alberto">San Alberto</option>
+              <option value="La Florida">La Florida</option>
+            </select>
+          </div>
+        </div>
+        <div class="acciones">
+          <button type="button" id="btn-agregar-direccion" class="secundario">+ Agregar esta dirección</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="seccion-pedido">
+    <h2>2. Pedido</h2>
+
+    <div class="fila">
+      <label for="ped-direccion">Dirección de entrega para este pedido *</label>
+      <select id="ped-direccion" required>
+        <option value="">— Primero busca o crea el cliente —</option>
+      </select>
+      <p id="ped-direccion-ayuda" class="ayuda oculto">Escribe la dirección arriba en "1. Cliente" y usa "+ Agregar esta dirección" para que aparezca aquí.</p>
+    </div>
+
+    <div class="fila-doble">
+      <div class="fila">
+        <label for="ped-producto">Producto *</label>
+        <select id="ped-producto" required>
+          <option value="">— Seleccionar —</option>
+          <option value="10kg Normal">Balón 10kg Normal</option>
+          <option value="10kg Premium">Balón 10kg Premium</option>
+          <option value="45kg">Balón 45kg</option>
+          <option value="Balon Fierro">Balón Fierro</option>
+          <option value="Accesorios / Reguladores">Accesorios / Reguladores</option>
+        </select>
+      </div>
+      <div class="fila">
+        <label for="ped-cantidad">Cantidad *</label>
+        <input type="number" id="ped-cantidad" min="1" value="1" required>
+      </div>
+    </div>
+
+    <div class="fila-doble">
+      <div class="fila">
+        <label for="ped-precio">Precio total (S/) *</label>
+        <input type="number" id="ped-precio" min="0" step="0.10" required>
+      </div>
+      <div class="fila">
+        <label for="ped-pago">Medio de pago previsto</label>
+        <select id="ped-pago">
+          <option value="">— No especificado —</option>
+          <option value="Efectivo">Efectivo</option>
+          <option value="Yape / Plin / Transf.">Yape / Plin / Transf.</option>
+          <option value="FISE">FISE</option>
+          <option value="POS">POS</option>
+          <option value="Credito">Crédito</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="fila-doble">
+      <div class="fila">
+        <label for="ped-origen">Origen de la venta *</label>
+        <select id="ped-origen" required>
+          <option value="">— Seleccionar —</option>
+          <option value="Delivery / WhatsApp">Delivery / WhatsApp</option>
+          <option value="Venta en Casa">Venta en Casa</option>
+        </select>
+      </div>
+      <div class="fila">
+        <label for="ped-barrio">Barrio / Sector <span class="ayuda">(si no sabes, déjalo así)</span></label>
+        <select id="ped-barrio">
+          <option value="Por Asignar">Por Asignar</option>
+          <option value="Barrio Centro">Barrio Centro</option>
+          <option value="Miraflores">Miraflores</option>
+          <option value="San Carlos">San Carlos</option>
+          <option value="San José">San José</option>
+          <option value="Quillazú">Quillazú</option>
+          <option value="Nueva Berna">Nueva Berna</option>
+          <option value="Santo Domingo">Santo Domingo</option>
+          <option value="Margaritas">Margaritas</option>
+          <option value="20 de Noviembre">20 de Noviembre</option>
+          <option value="Sec. La Esperanza">Sec. La Esperanza</option>
+          <option value="Llamaquizú">Llamaquizú</option>
+          <option value="San Alberto">San Alberto</option>
+          <option value="La Florida">La Florida</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="fila">
+      <label for="ped-recepcionista">Quién toma el pedido *</label>
+      <select id="ped-recepcionista" required>
+        <option value="">— Seleccionar —</option>
+        <option value="908 752 235 Primax Gas">908 752 235 Primax Gas</option>
+        <option value="950 622 840 Vendedora">950 622 840 Vendedora</option>
+        <option value="921 425 012 Miqueas">921 425 012 Miqueas</option>
+        <option value="904 191 903 Principal">904 191 903 Principal</option>
+        <option value="@JossGalvan">@JossGalvan</option>
+        <option value="951 514 579 Condor Parra">951 514 579 Condor Parra</option>
+        <option value="937 846 536 Yeshua Primax">937 846 536 Yeshua Primax</option>
+        <option value="941 487 716 Rossi">941 487 716 Rossi</option>
+        <option value="981 436 746 Well of Life">981 436 746 Well of Life</option>
+      </select>
+    </div>
+
+    <div class="fila">
+      <label for="ped-notas">Notas del pedido (opcional)</label>
+      <textarea id="ped-notas" rows="2" placeholder="Cualquier detalle que no sea de ubicación"></textarea>
+    </div>
+
+    <div class="acciones">
+      <button type="button" id="btn-cancelar-edicion" class="secundario oculto">Cancelar edición</button>
+      <button type="button" id="btn-guardar-pedido" class="primario">Guardar pedido</button>
+    </div>
+
+    <p id="mensaje-estado" class="mensaje-estado oculto"></p>
+
+    <div id="bloque-cancelar" class="bloque-peligro oculto">
+      <label for="ped-motivo-cancelacion">El cliente llamó a cancelar — motivo *</label>
+      <select id="ped-motivo-cancelacion">
+        <option value="">— Seleccionar motivo —</option>
+        <option value="X1 - Cancelado en puerta / Cliente ya no lo requiere">X1 - Cancelado en puerta / Cliente ya no lo requiere</option>
+        <option value="X2 - Compro a la competencia">X2 - Compró a la competencia</option>
+        <option value="X3 - Domicilio cerrado / Sin atencion">X3 - Domicilio cerrado / Sin atención</option>
+        <option value="X4 - Direccion incorrecta / Error de moto">X4 - Dirección incorrecta / Error de moto</option>
+        <option value="X5 - Tardanza en entrega">X5 - Tardanza en entrega</option>
+        <option value="X6 - Falta de stock">X6 - Falta de stock</option>
+      </select>
+      <button type="button" id="btn-cancelar-pedido" class="peligro">Marcar pedido como Cancelado</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Pedidos recientes</h2>
+    <div class="tabla-wrap">
+      <table id="tabla-pedidos">
+        <thead>
+          <tr>
+            <th>Hora</th>
+            <th>Cliente</th>
+            <th>Dirección</th>
+            <th>Producto</th>
+            <th>Cant.</th>
+            <th>Precio</th>
+            <th>Origen</th>
+            <th>Barrio</th>
+            <th>Estado</th>
+            <th>Recepcionista</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="cuerpo-tabla-pedidos">
+          <tr><td colspan="11">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
