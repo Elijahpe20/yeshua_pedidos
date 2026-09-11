@@ -11,6 +11,9 @@ const listaMisPedidos = el('lista-mis-pedidos');
 const listaHistorial = el('lista-historial');
 const mensajeEstado = el('mensaje-estado');
 
+const MEDIOS_PAGO = ['Efectivo', 'Yape / Plin / Transf.', 'FISE', 'POS', 'Credito'];
+const REQUIEREN_COMPROBANTE = ['Yape / Plin / Transf.', 'POS', 'Credito'];
+
 const CODIGOS_CANCELACION = [
   ['X1 - Cancelado en puerta / Cliente ya no lo requiere', 'X1 - Cancelado en puerta / Cliente ya no lo requiere'],
   ['X2 - Compro a la competencia', 'X2 - Compró a la competencia'],
@@ -83,6 +86,33 @@ function activarRepartidor() {
   mostrar(seccionHistorial);
   cargarMisPedidos();
   cargarHistorial();
+  iniciarCompartirUbicacion();
+}
+
+// -------- Compartir ubicación en vivo (Fase 6: asignación por cercanía) --------
+let intervaloUbicacion = null;
+
+function iniciarCompartirUbicacion() {
+  if (intervaloUbicacion || !navigator.geolocation) return;
+  compartirUbicacionAhora();
+  intervaloUbicacion = setInterval(compartirUbicacionAhora, 90000);
+}
+
+function compartirUbicacionAhora() {
+  const repartidorId = selectRepartidor.value;
+  if (!repartidorId) return;
+
+  navigator.geolocation.getCurrentPosition(
+    (posicion) => {
+      sb.from('repartidores').update({
+        ultima_lat: posicion.coords.latitude,
+        ultima_lng: posicion.coords.longitude,
+        ultima_ubicacion_en: new Date().toISOString()
+      }).eq('repartidor_id', repartidorId);
+    },
+    () => { /* sin permiso o sin señal: se reintenta en el próximo ciclo */ },
+    { timeout: 8000, maximumAge: 60000 }
+  );
 }
 
 // -------- Mis pedidos activos --------
@@ -130,6 +160,24 @@ function tarjetaPedido(p) {
         ${botonesSegunEstado(p)}
       </div>
 
+      <div class="bloque-entrega oculto">
+        <label>Medio(s) de pago recibido(s) *</label>
+        <div class="medios-pago">
+          ${MEDIOS_PAGO.map(m => `<label class="chk-etiqueta"><input type="checkbox" class="chk-medio" value="${m}"> ${m === 'Credito' ? 'Crédito' : m}</label>`).join('')}
+        </div>
+        <div class="montos-pago"></div>
+        <p class="suma-pago ayuda"></p>
+        <div class="fila-aclaracion oculto">
+          <label>Aclaración (opcional)</label>
+          <textarea class="texto-aclaracion" rows="2" placeholder="Ej: FISE cubrió parte, quedó un saldo en efectivo"></textarea>
+        </div>
+        <div class="fila-comprobante oculto">
+          <label class="label-comprobante">Foto(s) de comprobante</label>
+          <input type="file" class="input-comprobante" accept="image/*" capture="environment" multiple>
+        </div>
+        <button type="button" class="primario btn-confirmar-entrega">Confirmar entrega</button>
+      </div>
+
       <div class="bloque-peligro oculto bloque-cancelar-tarjeta">
         <label>Motivo de la cancelación *</label>
         <select class="motivo-cancelacion">
@@ -157,7 +205,7 @@ function botonesSegunEstado(p) {
   }
   if (p.estado === 'EnCamino') {
     return `
-      <button type="button" class="primario btn-entregado">Marcar Entregado</button>
+      <button type="button" class="primario btn-mostrar-entrega">Marcar Entregado</button>
       <button type="button" class="secundario btn-mostrar-cancelar">Cancelar pedido</button>
     `;
   }
@@ -167,10 +215,20 @@ function botonesSegunEstado(p) {
 function enlazarAccionesTarjetas(pedidos) {
   document.querySelectorAll('.pedido-card').forEach(tarjeta => {
     const pedidoId = tarjeta.dataset.id;
+    const pedido = pedidos.find(x => x.pedido_id === pedidoId);
 
     tarjeta.querySelector('.btn-aceptar')?.addEventListener('click', () => cambiarEstado(pedidoId, 'Aceptado', { fecha_hora_aceptado: new Date().toISOString() }));
     tarjeta.querySelector('.btn-en-camino')?.addEventListener('click', () => cambiarEstado(pedidoId, 'EnCamino', {}));
-    tarjeta.querySelector('.btn-entregado')?.addEventListener('click', () => cambiarEstado(pedidoId, 'Entregado', { fecha_hora_entregado: new Date().toISOString() }));
+
+    tarjeta.querySelector('.btn-mostrar-entrega')?.addEventListener('click', () => {
+      mostrar(tarjeta.querySelector('.bloque-entrega'));
+    });
+
+    tarjeta.querySelectorAll('.chk-medio').forEach(chk => {
+      chk.addEventListener('change', () => actualizarFormularioPago(tarjeta, pedido));
+    });
+
+    tarjeta.querySelector('.btn-confirmar-entrega')?.addEventListener('click', () => confirmarEntrega(pedido, tarjeta));
 
     tarjeta.querySelector('.btn-mostrar-cancelar')?.addEventListener('click', () => {
       mostrar(tarjeta.querySelector('.bloque-cancelar-tarjeta'));
@@ -188,6 +246,149 @@ function enlazarAccionesTarjetas(pedidos) {
       reportarProblema(pedidoId, texto, tarjeta);
     });
   });
+}
+
+// -------- Formulario de pago al marcar Entregado --------
+function actualizarFormularioPago(tarjeta, pedido) {
+  const marcados = [...tarjeta.querySelectorAll('.chk-medio:checked')].map(c => c.value);
+  const contenedorMontos = tarjeta.querySelector('.montos-pago');
+  const filaAclaracion = tarjeta.querySelector('.fila-aclaracion');
+  const filaComprobante = tarjeta.querySelector('.fila-comprobante');
+  const labelComprobante = tarjeta.querySelector('.label-comprobante');
+
+  if (marcados.length === 0) {
+    contenedorMontos.innerHTML = '';
+  } else if (marcados.length === 1) {
+    contenedorMontos.innerHTML = `<p class="pedido-campo"><strong>Monto (${marcados[0] === 'Credito' ? 'Crédito' : marcados[0]}):</strong> S/ ${Number(pedido.precio).toFixed(2)}</p>`;
+  } else {
+    contenedorMontos.innerHTML = marcados.map(m => `
+      <div class="fila">
+        <label>Monto ${m === 'Credito' ? 'Crédito' : m}</label>
+        <input type="number" class="input-monto" data-medio="${m}" min="0" step="0.10">
+      </div>
+    `).join('');
+    contenedorMontos.querySelectorAll('.input-monto').forEach(inp => {
+      inp.addEventListener('input', () => actualizarSumaPago(tarjeta, pedido));
+    });
+  }
+
+  if (marcados.length >= 2) { mostrar(filaAclaracion); } else { ocultar(filaAclaracion); }
+
+  const necesitaComprobante = marcados.some(m => REQUIEREN_COMPROBANTE.includes(m));
+  if (marcados.length > 0) {
+    mostrar(filaComprobante);
+    labelComprobante.textContent = necesitaComprobante ? 'Foto(s) de comprobante *' : 'Foto(s) de comprobante (opcional)';
+  } else {
+    ocultar(filaComprobante);
+  }
+
+  actualizarSumaPago(tarjeta, pedido);
+}
+
+function actualizarSumaPago(tarjeta, pedido) {
+  const marcados = [...tarjeta.querySelectorAll('.chk-medio:checked')].map(c => c.value);
+  const resumen = tarjeta.querySelector('.suma-pago');
+
+  if (marcados.length < 2) { resumen.textContent = ''; return; }
+
+  const montos = [...tarjeta.querySelectorAll('.input-monto')].map(i => Number(i.value) || 0);
+  const suma = montos.reduce((a, b) => a + b, 0);
+  const precio = Number(pedido.precio);
+
+  if (Math.abs(suma - precio) < 0.01) {
+    resumen.textContent = `✓ Suma: S/ ${suma.toFixed(2)} — coincide con el precio.`;
+    resumen.style.color = '#1f7a2b';
+  } else {
+    resumen.textContent = `⚠ Suma: S/ ${suma.toFixed(2)} — el precio es S/ ${precio.toFixed(2)}. Corrige los montos.`;
+    resumen.style.color = '#a12b2b';
+  }
+}
+
+function obtenerMontosPago(tarjeta, pedido) {
+  const marcados = [...tarjeta.querySelectorAll('.chk-medio:checked')].map(c => c.value);
+  if (marcados.length === 0) return null;
+
+  if (marcados.length === 1) {
+    return [{ tipo: marcados[0], monto: Number(pedido.precio) }];
+  }
+
+  const medios = [...tarjeta.querySelectorAll('.input-monto')].map(i => ({
+    tipo: i.dataset.medio,
+    monto: Number(i.value) || 0
+  }));
+  const suma = medios.reduce((a, m) => a + m.monto, 0);
+  if (Math.abs(suma - Number(pedido.precio)) >= 0.01) return 'DESCUADRE';
+  return medios;
+}
+
+async function confirmarEntrega(pedido, tarjeta) {
+  const marcados = [...tarjeta.querySelectorAll('.chk-medio:checked')].map(c => c.value);
+  if (marcados.length === 0) { mostrarMensaje('Marca al menos un medio de pago.', 'error'); return; }
+
+  const medios = obtenerMontosPago(tarjeta, pedido);
+  if (medios === 'DESCUADRE') { mostrarMensaje('Los montos no suman el precio del pedido. Corrígelos o usa "Reportar un problema".', 'error'); return; }
+
+  const necesitaComprobante = marcados.some(m => REQUIEREN_COMPROBANTE.includes(m));
+  const archivos = tarjeta.querySelector('.input-comprobante').files;
+  if (necesitaComprobante && archivos.length === 0) {
+    mostrarMensaje('Falta la foto del comprobante (obligatoria para Yape/Plin/Transf., POS o Crédito).', 'error');
+    return;
+  }
+
+  const boton = tarjeta.querySelector('.btn-confirmar-entrega');
+  boton.disabled = true;
+  boton.textContent = 'Guardando...';
+
+  try {
+    const urls = [];
+    for (const archivo of archivos) {
+      const ruta = `${pedido.pedido_id}/${Date.now()}_${archivo.name}`;
+      const { error: errorSubida } = await sb.storage.from('comprobantes').upload(ruta, archivo);
+      if (errorSubida) throw errorSubida;
+      const { data: urlData } = sb.storage.from('comprobantes').getPublicUrl(ruta);
+      urls.push(urlData.publicUrl);
+    }
+
+    const aclaracion = tarjeta.querySelector('.texto-aclaracion').value.trim();
+
+    const { error } = await sb
+      .from('pedidos')
+      .update({
+        estado: 'Entregado',
+        fecha_hora_entregado: new Date().toISOString(),
+        medio_pago_real: { medios, aclaracion: aclaracion || null },
+        voucher_fotos: urls.length ? urls : null
+      })
+      .eq('pedido_id', pedido.pedido_id);
+
+    if (error) throw error;
+
+    capturarPinCliente(pedido.cliente_id);
+
+    mostrarMensaje('Pedido entregado y registrado.', 'ok');
+    cargarMisPedidos();
+    cargarHistorial();
+  } catch (err) {
+    mostrarMensaje('Error guardando la entrega: ' + err.message, 'error');
+    boton.disabled = false;
+    boton.textContent = 'Confirmar entrega';
+  }
+}
+
+function capturarPinCliente(clienteId) {
+  if (!navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(
+    async (posicion) => {
+      await sb.from('clientes').update({
+        pin_lat: posicion.coords.latitude,
+        pin_lng: posicion.coords.longitude,
+        pin_fecha_actualizacion: new Date().toISOString()
+      }).eq('cliente_id', clienteId);
+    },
+    () => { /* sin ubicación disponible: no bloquea la entrega, se ignora */ },
+    { timeout: 8000, maximumAge: 60000 }
+  );
 }
 
 async function cambiarEstado(pedidoId, nuevoEstado, camposExtra) {

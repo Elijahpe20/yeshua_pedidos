@@ -55,6 +55,8 @@
         <button type="button" id="btn-guardar-cliente" class="secundario">Guardar datos del cliente</button>
       </div>
 
+      <div id="bloque-pin-cliente" class="banner oculto"></div>
+
       <div class="fila">
         <label>Direcciones guardadas de este cliente</label>
         <div id="lista-direcciones" class="lista-direcciones">
@@ -171,6 +173,27 @@
           <option value="San Alberto">San Alberto</option>
           <option value="La Florida">La Florida</option>
         </select>
+      </div>
+    </div>
+
+    <div class="bloque-entrega oculto" id="bloque-pago-mostrador">
+      <label>Venta de mostrador — medio(s) de pago recibido(s) ahora mismo *</label>
+      <div class="medios-pago" id="medios-pago-mostrador">
+        <label class="chk-etiqueta"><input type="checkbox" class="chk-medio-mostrador" value="Efectivo"> Efectivo</label>
+        <label class="chk-etiqueta"><input type="checkbox" class="chk-medio-mostrador" value="Yape / Plin / Transf."> Yape / Plin / Transf.</label>
+        <label class="chk-etiqueta"><input type="checkbox" class="chk-medio-mostrador" value="FISE"> FISE</label>
+        <label class="chk-etiqueta"><input type="checkbox" class="chk-medio-mostrador" value="POS"> POS</label>
+        <label class="chk-etiqueta"><input type="checkbox" class="chk-medio-mostrador" value="Credito"> Crédito</label>
+      </div>
+      <div class="montos-pago" id="montos-pago-mostrador"></div>
+      <p class="suma-pago ayuda" id="suma-pago-mostrador"></p>
+      <div class="fila-aclaracion oculto" id="fila-aclaracion-mostrador">
+        <label for="aclaracion-mostrador">Aclaración (opcional)</label>
+        <textarea id="aclaracion-mostrador" rows="2"></textarea>
+      </div>
+      <div class="fila-comprobante oculto" id="fila-comprobante-mostrador">
+        <label class="label-comprobante" id="label-comprobante-mostrador">Foto(s) de comprobante</label>
+        <input type="file" id="input-comprobante-mostrador" accept="image/*" multiple>
       </div>
     </div>
 

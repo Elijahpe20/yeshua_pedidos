@@ -44,8 +44,21 @@ const cuerpoTabla = el('cuerpo-tabla-pedidos');
 const bloqueCancelar = el('bloque-cancelar');
 const pedMotivoCancelacion = el('ped-motivo-cancelacion');
 const listaIncidencias = el('lista-incidencias');
+const bloquePinCliente = el('bloque-pin-cliente');
+
+const bloquePagoMostrador = el('bloque-pago-mostrador');
+const montosPagoMostrador = el('montos-pago-mostrador');
+const sumaPagoMostrador = el('suma-pago-mostrador');
+const filaAclaracionMostrador = el('fila-aclaracion-mostrador');
+const aclaracionMostrador = el('aclaracion-mostrador');
+const filaComprobanteMostrador = el('fila-comprobante-mostrador');
+const labelComprobanteMostrador = el('label-comprobante-mostrador');
+const inputComprobanteMostrador = el('input-comprobante-mostrador');
 
 let repartidoresActivos = [];
+
+const MEDIOS_PAGO = ['Efectivo', 'Yape / Plin / Transf.', 'FISE', 'POS', 'Credito'];
+const REQUIEREN_COMPROBANTE = ['Yape / Plin / Transf.', 'POS', 'Credito'];
 
 // -------- Utilidades --------
 function mostrar(elemento) { elemento.classList.remove('oculto'); }
@@ -94,6 +107,7 @@ function limpiarFormularioCliente() {
   renderDirecciones();
   renderSelectDireccionPedido();
   actualizarBannerCliente('nuevo');
+  ocultar(bloquePinCliente);
 }
 
 function limpiarFormularioPedido() {
@@ -113,6 +127,103 @@ function limpiarFormularioPedido() {
   ocultar(btnCancelarEdicion);
   ocultar(bloqueCancelar);
   habilitarCamposPedido(true);
+  limpiarPagoMostrador();
+}
+
+function limpiarPagoMostrador() {
+  document.querySelectorAll('.chk-medio-mostrador').forEach(chk => { chk.checked = false; });
+  montosPagoMostrador.innerHTML = '';
+  sumaPagoMostrador.textContent = '';
+  aclaracionMostrador.value = '';
+  inputComprobanteMostrador.value = '';
+  ocultar(bloquePagoMostrador);
+  ocultar(filaAclaracionMostrador);
+  ocultar(filaComprobanteMostrador);
+  mostrar(pedPago.closest('.fila'));
+  pedDireccion.required = true;
+}
+
+pedOrigen.addEventListener('change', () => {
+  if (pedOrigen.value === 'Venta en Casa') {
+    mostrar(bloquePagoMostrador);
+    ocultar(pedPago.closest('.fila'));
+    pedDireccion.required = false;
+  } else {
+    ocultar(bloquePagoMostrador);
+    mostrar(pedPago.closest('.fila'));
+    pedDireccion.required = true;
+  }
+});
+
+document.querySelectorAll('.chk-medio-mostrador').forEach(chk => {
+  chk.addEventListener('change', actualizarFormularioPagoMostrador);
+});
+
+function actualizarFormularioPagoMostrador() {
+  const marcados = [...document.querySelectorAll('.chk-medio-mostrador:checked')].map(c => c.value);
+  const precio = Number(pedPrecio.value) || 0;
+
+  if (marcados.length === 0) {
+    montosPagoMostrador.innerHTML = '';
+  } else if (marcados.length === 1) {
+    montosPagoMostrador.innerHTML = `<p class="pedido-campo"><strong>Monto (${marcados[0] === 'Credito' ? 'Crédito' : marcados[0]}):</strong> S/ ${precio.toFixed(2)}</p>`;
+  } else {
+    montosPagoMostrador.innerHTML = marcados.map(m => `
+      <div class="fila">
+        <label>Monto ${m === 'Credito' ? 'Crédito' : m}</label>
+        <input type="number" class="input-monto-mostrador" data-medio="${m}" min="0" step="0.10">
+      </div>
+    `).join('');
+    montosPagoMostrador.querySelectorAll('.input-monto-mostrador').forEach(inp => {
+      inp.addEventListener('input', actualizarSumaPagoMostrador);
+    });
+  }
+
+  if (marcados.length >= 2) { mostrar(filaAclaracionMostrador); } else { ocultar(filaAclaracionMostrador); }
+
+  const necesitaComprobante = marcados.some(m => REQUIEREN_COMPROBANTE.includes(m));
+  if (marcados.length > 0) {
+    mostrar(filaComprobanteMostrador);
+    labelComprobanteMostrador.textContent = necesitaComprobante ? 'Foto(s) de comprobante *' : 'Foto(s) de comprobante (opcional)';
+  } else {
+    ocultar(filaComprobanteMostrador);
+  }
+
+  actualizarSumaPagoMostrador();
+}
+
+function actualizarSumaPagoMostrador() {
+  const marcados = [...document.querySelectorAll('.chk-medio-mostrador:checked')].map(c => c.value);
+  if (marcados.length < 2) { sumaPagoMostrador.textContent = ''; return; }
+
+  const montos = [...document.querySelectorAll('.input-monto-mostrador')].map(i => Number(i.value) || 0);
+  const suma = montos.reduce((a, b) => a + b, 0);
+  const precio = Number(pedPrecio.value) || 0;
+
+  if (Math.abs(suma - precio) < 0.01) {
+    sumaPagoMostrador.textContent = `✓ Suma: S/ ${suma.toFixed(2)} — coincide con el precio.`;
+    sumaPagoMostrador.style.color = '#1f7a2b';
+  } else {
+    sumaPagoMostrador.textContent = `⚠ Suma: S/ ${suma.toFixed(2)} — el precio es S/ ${precio.toFixed(2)}. Corrige los montos.`;
+    sumaPagoMostrador.style.color = '#a12b2b';
+  }
+}
+
+function obtenerMontosPagoMostrador() {
+  const marcados = [...document.querySelectorAll('.chk-medio-mostrador:checked')].map(c => c.value);
+  if (marcados.length === 0) return null;
+
+  if (marcados.length === 1) {
+    return [{ tipo: marcados[0], monto: Number(pedPrecio.value) || 0 }];
+  }
+
+  const medios = [...document.querySelectorAll('.input-monto-mostrador')].map(i => ({
+    tipo: i.dataset.medio,
+    monto: Number(i.value) || 0
+  }));
+  const suma = medios.reduce((a, m) => a + m.monto, 0);
+  if (Math.abs(suma - (Number(pedPrecio.value) || 0)) >= 0.01) return 'DESCUADRE';
+  return medios;
 }
 
 function habilitarCamposPedido(habilitado) {
@@ -357,6 +468,30 @@ async function seleccionarCliente(cliente) {
   buscarClienteInput.value = '';
   actualizarBannerCliente('existente', cliente.nombre_o_negocio || cliente.telefono);
   await cargarDireccionesCliente(cliente.cliente_id);
+  renderPinCliente(cliente);
+}
+
+function renderPinCliente(cliente) {
+  if (!cliente || cliente.pin_lat == null || cliente.pin_lng == null) {
+    ocultar(bloquePinCliente);
+    return;
+  }
+
+  const fecha = cliente.pin_fecha_actualizacion ? formatearFecha(cliente.pin_fecha_actualizacion) : 'fecha desconocida';
+  bloquePinCliente.innerHTML = `
+    📍 Ubicación GPS guardada (confirmada: ${fecha})
+    <button type="button" id="btn-borrar-pin" class="secundario" style="margin-left:0.6rem;">Borrar ubicación</button>
+  `;
+  bloquePinCliente.className = 'banner';
+  mostrar(bloquePinCliente);
+
+  el('btn-borrar-pin').addEventListener('click', async () => {
+    if (!confirm('¿Borrar la ubicación GPS guardada de este cliente? Se usará solo la dirección de texto hasta que se capture una nueva.')) return;
+    const { error } = await sb.from('clientes').update({ pin_lat: null, pin_lng: null, pin_fecha_actualizacion: null }).eq('cliente_id', clienteSeleccionadoId);
+    if (error) { mostrarMensaje('Error borrando ubicación: ' + error.message, 'error'); return; }
+    mostrarMensaje('Ubicación borrada.', 'ok');
+    ocultar(bloquePinCliente);
+  });
 }
 
 el('btn-cliente-nuevo').addEventListener('click', limpiarFormularioCliente);
@@ -424,12 +559,30 @@ async function guardarPedido() {
     return;
   }
 
+  const esVentaEnCasa = pedOrigen.value === 'Venta en Casa' && !pedidoEnEdicionId;
+
   // Validación básica
-  if (!pedDireccion.value) { mostrarMensaje('Falta elegir la dirección de entrega.', 'error'); return; }
+  if (!esVentaEnCasa && !pedDireccion.value) { mostrarMensaje('Falta elegir la dirección de entrega.', 'error'); return; }
   if (!pedProducto.value) { mostrarMensaje('Falta elegir el producto.', 'error'); return; }
   if (!pedOrigen.value) { mostrarMensaje('Falta elegir el origen de la venta.', 'error'); return; }
   if (!pedPrecio.value) { mostrarMensaje('Falta el precio.', 'error'); return; }
   if (!pedRecepcionista.value.trim()) { mostrarMensaje('Falta indicar quién toma el pedido.', 'error'); return; }
+
+  let mediosPagoMostrador = null;
+  let comprobantesMostrador = [];
+  if (esVentaEnCasa) {
+    const marcados = [...document.querySelectorAll('.chk-medio-mostrador:checked')].map(c => c.value);
+    if (marcados.length === 0) { mostrarMensaje('Marca al menos un medio de pago recibido.', 'error'); return; }
+
+    mediosPagoMostrador = obtenerMontosPagoMostrador();
+    if (mediosPagoMostrador === 'DESCUADRE') { mostrarMensaje('Los montos no suman el precio del pedido. Corrígelos.', 'error'); return; }
+
+    const necesitaComprobante = marcados.some(m => REQUIEREN_COMPROBANTE.includes(m));
+    if (necesitaComprobante && inputComprobanteMostrador.files.length === 0) {
+      mostrarMensaje('Falta la foto del comprobante (obligatoria para Yape/Plin/Transf., POS o Crédito).', 'error');
+      return;
+    }
+  }
 
   btnGuardarPedido.disabled = true;
 
@@ -455,14 +608,27 @@ async function guardarPedido() {
 
     // 2. Determinar qué dirección se usa para este pedido
     let direccionEntrega;
-    if (pedDireccion.value === '__historica__') {
+    if (esVentaEnCasa) {
+      direccionEntrega = null;
+    } else if (pedDireccion.value === '__historica__') {
       direccionEntrega = direccionEntregaOriginalEdicion;
     } else {
       const direccionElegida = direccionesClienteActual.find(d => d.direccion_id === pedDireccion.value);
       direccionEntrega = direccionElegida ? direccionElegida.direccion : null;
     }
 
-    // 3. Crear o actualizar pedido
+    // 3. Si es venta de mostrador, subir las fotos de comprobante ahora
+    if (esVentaEnCasa && inputComprobanteMostrador.files.length > 0) {
+      for (const archivo of inputComprobanteMostrador.files) {
+        const ruta = `mostrador_${Date.now()}_${archivo.name}`;
+        const { error: errorSubida } = await sb.storage.from('comprobantes').upload(ruta, archivo);
+        if (errorSubida) throw errorSubida;
+        const { data: urlData } = sb.storage.from('comprobantes').getPublicUrl(ruta);
+        comprobantesMostrador.push(urlData.publicUrl);
+      }
+    }
+
+    // 4. Crear o actualizar pedido
     const datosPed = {
       cliente_id: idCliente,
       recepcionista: pedRecepcionista.value.trim(),
@@ -475,6 +641,13 @@ async function guardarPedido() {
       direccion_entrega: direccionEntrega,
       notas: pedNotas.value.trim() || null
     };
+
+    if (esVentaEnCasa) {
+      datosPed.estado = 'Entregado';
+      datosPed.fecha_hora_entregado = new Date().toISOString();
+      datosPed.medio_pago_real = { medios: mediosPagoMostrador, aclaracion: aclaracionMostrador.value.trim() || null };
+      datosPed.voucher_fotos = comprobantesMostrador.length ? comprobantesMostrador : null;
+    }
 
     let pedidoGuardado;
 
@@ -494,7 +667,7 @@ async function guardarPedido() {
       const { data, error } = await sb.from('pedidos').insert(datosPed).select().single();
       if (error) throw error;
       pedidoGuardado = data;
-      mostrarMensaje('Pedido guardado.', 'ok');
+      mostrarMensaje(esVentaEnCasa ? 'Venta de mostrador registrada como Entregado.' : 'Pedido guardado.', 'ok');
     }
 
     limpiarFormularioPedido();
@@ -537,7 +710,7 @@ async function cancelarPedido() {
 async function cargarPedidosRecientes() {
   const { data, error } = await sb
     .from('pedidos')
-    .select('*, clientes(nombre_o_negocio, telefono, tipo, notas), repartidores(nombre)')
+    .select('*, clientes(nombre_o_negocio, telefono, tipo, notas, pin_lat, pin_lng), repartidores(nombre)')
     .order('fecha_hora_creado', { ascending: false })
     .limit(30);
 
@@ -577,16 +750,52 @@ async function cargarPedidosRecientes() {
   });
 }
 
+const QUINCE_MINUTOS_MS = 15 * 60 * 1000;
+
+function distanciaKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function celdaRepartidor(p) {
   if (p.estado === 'Creado') {
-    const opciones = repartidoresActivos.map(r =>
-      `<option value="${r.repartidor_id}">${escaparHtml(r.nombre)}</option>`
+    const pinCliente = p.clientes?.pin_lat != null && p.clientes?.pin_lng != null ? p.clientes : null;
+    const ahora = Date.now();
+
+    const lista = repartidoresActivos.map(r => {
+      const tieneUbicacionReciente = r.ultima_ubicacion_en &&
+        (ahora - new Date(r.ultima_ubicacion_en).getTime()) < QUINCE_MINUTOS_MS &&
+        r.ultima_lat != null && r.ultima_lng != null;
+
+      const distancia = (pinCliente && tieneUbicacionReciente)
+        ? distanciaKm(pinCliente.pin_lat, pinCliente.pin_lng, r.ultima_lat, r.ultima_lng)
+        : null;
+
+      return { ...r, distancia };
+    });
+
+    lista.sort((a, b) => {
+      if (a.distancia == null && b.distancia == null) return a.nombre.localeCompare(b.nombre);
+      if (a.distancia == null) return 1;
+      if (b.distancia == null) return -1;
+      return a.distancia - b.distancia;
+    });
+
+    const opciones = lista.map(r =>
+      `<option value="${r.repartidor_id}">${escaparHtml(r.nombre)}${r.distancia != null ? ' — ' + r.distancia.toFixed(1) + ' km' : ''}</option>`
     ).join('');
+
     return `
       <select class="select-asignar" data-asignar="${p.pedido_id}">
         <option value="">— Asignar —</option>
         ${opciones}
       </select>
+      ${!pinCliente ? '<div class="ayuda">Cliente sin ubicación guardada</div>' : ''}
     `;
   }
   return escaparHtml(p.repartidores?.nombre || '—');
@@ -694,6 +903,7 @@ async function cargarPedidoParaEditar(p) {
   cliNombre.value = p.clientes?.nombre_o_negocio || '';
   cliTipo.value = p.clientes?.tipo || '';
   cliNotas.value = p.clientes?.notas || '';
+  renderPinCliente(p.clientes);
 
   bannerCliente.textContent = p.estado === 'Creado'
     ? `✓ Editando pedido de ${p.clientes?.nombre_o_negocio || p.clientes?.telefono || 'cliente'} (estado: Creado — se puede editar todo)`
@@ -744,3 +954,10 @@ renderSelectDireccionPedido();
   cargarPedidosRecientes();
   cargarIncidencias();
 })();
+
+// Refresca la ubicación de los repartidores y la tabla cada minuto,
+// para que la lista de "más cerca a más lejos" no se quede vieja.
+setInterval(async () => {
+  await cargarRepartidores();
+  cargarPedidosRecientes();
+}, 60000);

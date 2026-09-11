@@ -428,6 +428,47 @@ tr:hover td {
   padding-top: 0.8rem;
 }
 
+.bloque-entrega {
+  margin-top: 0.8rem;
+  border: 1px solid #b6cfe3;
+  background: #f5f9fd;
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.medios-pago {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+}
+
+.chk-etiqueta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 400;
+  color: #333;
+}
+
+.chk-etiqueta input { width: auto; }
+
+.montos-pago .fila {
+  margin-bottom: 0.5rem;
+}
+
+.suma-pago {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.input-comprobante {
+  padding: 0.4rem 0;
+}
+
 @media (max-width: 640px) {
   .fila-doble { flex-direction: column; }
   .buscador { flex-direction: column; }
